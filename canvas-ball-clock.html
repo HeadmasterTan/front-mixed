@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Document</title>
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+		}
+	</style>
+</head>
+<body>
+	<canvas id="canvas"></canvas>
+
+	<script>
+		var clientWidth = document.documentElement.clientWidth;
+		var clientHeight = document.documentElement.clientHeight - 4;
+		var canvas = document.getElementById('canvas');
+		canvas.width = clientWidth;
+		canvas.height = clientHeight;
+		var ctx = canvas.getContext('2d');
+
+		// 定位，居中偏上
+		var topX = (clientWidth / 2) - ((5 * 100 + 2 * 70 + 75) / 2);
+		var topY = clientHeight * 0.2;
+		var numWidth = 100; // 一个数字的宽度
+		var colonWidth = 70; // 一个冒号的宽度
+		var g = 0.001; // 垂直加速度
+		var fps = 1000 / 60;
+		var r = 5; // 小球半径
+		var collision = 0.1; // 碰撞损耗
+		var lastTime = 0; // 记录上一次的秒数
+		var pushBall = true; // 本次是否可以将小球放进数组
+		var clearMinHorV = 0.005; // 横向速度最低值。小球垂直方向不再运动时，横向速度低于最低值则清除
+
+		// 可选颜色
+		var colors = ['#2db7f5', '#19be6b', '#ff9900', '#ed4014'];
+		// 小球列表，用于小球运动
+		var ballList = [];
+
+		// 绘画小球
+		function drawBalls(list) {
+			list = list || ballList;
+
+			for (var i = 0; i < list.length; i++) {
+
+				var ball = list[i];
+				ball.verV = ball.verV + ball.g * fps;
+				ball.x += ball.horV * fps;
+				if (ball.g > 0) {
+					ball.y += ball.verV * fps; // 随便算的，实际上垂直下落距离比这个复杂些
+				} else {
+					ball.y -= ball.verV * fps; // 随便算的，实际上垂直下落距离比这个复杂些
+				}
+
+				if (ball.x <= -r || ball.x >= clientWidth + r) { // 小球超出了屏幕
+					list.splice(i ,1);
+					i--;
+					continue; // 这个球不要了，跳过
+				}
+				if (ball.y >= clientHeight - r) {
+					ball.y = clientHeight - r;
+					ball.verV -= collision; // 碰撞损耗
+					ball.g = -ball.g;
+				}
+				if (ball.verV <= 0) {
+					ball.g = -ball.g;
+				}
+				if (ball.verV <= 0 && ball.y >= clientHeight - r && Math.abs(ball.horV) < clearMinHorV) { // 小球停止了垂直方向的运动
+					list.splice(i ,1);
+					i--;
+					continue; // 这个球不要了，跳过
+				}
+
+				list[i] = ball;
+
+				ctx.save();
+				ctx.beginPath();
+
+				ctx.arc(ball.x, ball.y, r, 0, Math.PI * 2);
+				ctx.fillStyle = ball.color;
+				ctx.strokeStyle = ball.color;
+				ctx.fill();
+				ctx.stroke();
+
+				ctx.restore();
+			}
+		}
+
+		// 绘画时钟
+		function drawMatrix(locatX, locatY, num, flag) {
+			var r = r || 5;
+			var x = x || 15;
+			var y = y || 15;
+			var list = matrixList[num];
+
+			var randomColor = Math.floor(Math.random() * colors.length);
+
+			for (var i = 0; i < list.length; i++) {
+				for (var j = 0; j < list[i].length; j++) {
+					if (list[i][j]) {
+						if (flag && pushBall) {
+							var horV = parseFloat(Math.random().toFixed(3)) / 10;
+							var verV = parseFloat(Math.random().toFixed(3)) / 30;
+							var ranHorV = Math.floor(Math.random() * 2);
+							horV = horV == 0 ? ranHorV ? 0.1 : -0.1 : ranHorV ? horV : -horV;
+							verV = verV == 0 ? 0.01 : verV;
+							var ball = {
+								horV: horV == 0 ? 0.1 : horV, // 水平速度
+								verV: verV == 0 ? 0.1 : verV, // 垂直速度
+								x: locatX + x * (j + 1) + r, // x 轴坐标
+								y: locatY + y * (i + 1), // y 轴坐标
+								color: colors[randomColor],
+								g: g
+							};
+							ballList.push(ball);
+						}
+
+						ctx.moveTo(locatX + x * (j + 1) + r, locatY + y * (i + 1));
+						ctx.arc(locatX + x * (j + 1), locatY + y * (i + 1), r, 0, 2 * Math.PI);
+					}
+				}
+			}
+		}
+
+		var color = Math.floor(Math.random() * 4);
+
+		function changeTime() {
+			canvas.width = canvas.width;
+
+			var date = new Date();
+			var hour = date.getHours();
+			var minu = date.getMinutes();
+			var sec = date.getSeconds();
+
+			var pushFlag = canPushBall(hour, minu, sec);
+			pushBall = false;
+
+			if (sec != lastTime) {
+				lastTime = sec;
+				pushBall = true;
+			}
+
+
+			drawMatrix(topX + numWidth * 0 + colonWidth * 0, topY, Math.floor(hour / 10), pushFlag[0]); // 时
+			drawMatrix(topX + numWidth * 1 + colonWidth * 0, topY, hour % 10, pushFlag[1]);
+			drawMatrix(topX + numWidth * 2 + colonWidth * 0, topY, 10); // 冒号
+			drawMatrix(topX + numWidth * 2 + colonWidth * 1, topY, Math.floor(minu / 10), pushFlag[2]); // 分
+			drawMatrix(topX + numWidth * 3 + colonWidth * 1, topY, minu % 10, pushFlag[3]);
+			drawMatrix(topX + numWidth * 4 + colonWidth * 1, topY, 10); // 冒号
+			drawMatrix(topX + numWidth * 4 + colonWidth * 2, topY, Math.floor(sec / 10), pushFlag[4]);  // 秒
+			drawMatrix(topX + numWidth * 5 + colonWidth * 2, topY, sec % 10, pushFlag[5]);
+
+			ctx.fillStyle = colors[color];
+			ctx.strokeStyle = colors[color];
+			ctx.fill();
+			ctx.stroke();
+
+			drawBalls();
+
+			setTimeout(changeTime, fps);
+		}
+
+		// 是否要将小球添加到列表，使他运动起来
+		function canPushBall(hour, minu, sec) {
+			var flagList = [false, false, false, false, false, true];
+			if (sec % 10 == 0) { // 秒数就要走过了 10 秒
+				flagList[4] = true;
+			}
+			if (sec == 0) { // 秒数就要走过了 60 秒
+				flagList[3] = true;
+			}
+			if (sec == 0 && minu % 10 == 0) { // 分钟就要走过了 10 分钟
+				flagList[2] = true;
+			}
+			if (minu == 0 && sec == 0) { // 分钟就要走过了 60 分钟
+				flagList[1] = true;
+			}
+			if (minu == 0 && sec == 0 && hour % 10 == 0) { // 小时就要走过了 10 小时
+				flagList[0] = true;
+			}
+			if (minu == 0 && sec == 0 && hour == 0) { // 小时就要走过了 24 小时
+				flagList[0] = true;
+			}
+
+			return flagList;
+		}
+
+		var matrixList = [
+			[
+				[1, 1, 1, 1, 1], // 数字 0
+				[1, 0, 0, 0, 1],
+				[1, 0, 0, 0, 1],
+				[1, 0, 0, 0, 1],
+				[1, 0, 0, 0, 1],
+				[1, 0, 0, 0, 1],
+				[1, 1, 1, 1, 1],
+			],
+			[
+				[0, 0, 1, 0, 0], // 数字 1
+				[0, 1, 1, 0, 0],
+				[0, 0, 1, 0, 0],
+				[0, 0, 1, 0, 0],
+				[0, 0, 1, 0, 0],
+				[0, 0, 1, 0, 0],
+				[0, 1, 1, 1, 0],
+			],
+			[
+				[1, 1, 1, 1, 1], // 数字 2
+				[0, 0, 0, 0, 1],
+				[0, 0, 0, 0, 1],
+				[1, 1, 1, 1, 1],
+				[1, 0, 0, 0, 0],
+				[1, 0, 0, 0, 0],
+				[1, 1, 1, 1, 1],
+			],
+			[
+				[1, 1, 1, 1, 1], // 数字 3
+				[0, 0, 0, 0, 1],
+				[0, 0, 0, 0, 1],
+				[1, 1, 1, 1, 1],
+				[0, 0, 0, 0, 1],
+				[0, 0, 0, 0, 1],
+				[1, 1, 1, 1, 1],
+			],
+			[
+				[1, 0, 0, 0, 1], // 数字 4
+				[1, 0, 0, 0, 1],
+				[1, 0, 0, 0, 1],
+				[1, 1, 1, 1, 1],
+				[0, 0, 0, 0, 1],
+				[0, 0, 0, 0, 1],
+				[0, 0, 0, 0, 1],
+			],
+			[
+				[1, 1, 1, 1, 1], // 数字 5
+				[1, 0, 0, 0, 0],
+				[1, 0, 0, 0, 0],
+				[1, 1, 1, 1, 1],
+				[0, 0, 0, 0, 1],
+				[0, 0, 0, 0, 1],
+				[1, 1, 1, 1, 1],
+			],
+			[
+				[1, 1, 1, 1, 1], // 数字 6
+				[1, 0, 0, 0, 0],
+				[1, 0, 0, 0, 0],
+				[1, 1, 1, 1, 1],
+				[1, 0, 0, 0, 1],
+				[1, 0, 0, 0, 1],
+				[1, 1, 1, 1, 1],
+			],
+			[
+				[1, 1, 1, 1, 1], // 数字 7
+				[0, 0, 0, 0, 1],
+				[0, 0, 0, 0, 1],
+				[0, 0, 0, 0, 1],
+				[0, 0, 0, 0, 1],
+				[0, 0, 0, 0, 1],
+				[0, 0, 0, 0, 1],
+			],
+			[
+				[1, 1, 1, 1, 1], // 数字 8
+				[1, 0, 0, 0, 1],
+				[1, 0, 0, 0, 1],
+				[1, 1, 1, 1, 1],
+				[1, 0, 0, 0, 1],
+				[1, 0, 0, 0, 1],
+				[1, 1, 1, 1, 1],
+			],
+			[
+				[1, 1, 1, 1, 1], // 数字 9
+				[1, 0, 0, 0, 1],
+				[1, 0, 0, 0, 1],
+				[1, 1, 1, 1, 1],
+				[0, 0, 0, 0, 1],
+				[0, 0, 0, 0, 1],
+				[1, 1, 1, 1, 1],
+			],
+			[
+				[0, 0, 0], // 冒号
+				[0, 0, 0],
+				[0, 1, 0],
+				[0, 0, 0],
+				[0, 1, 0],
+				[0, 0, 0],
+				[0, 0, 0],
+			],
+		];
+
+		changeTime();
+	</script>
+</body>
+</html>
